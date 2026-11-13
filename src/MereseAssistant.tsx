@@ -22,6 +22,7 @@ export default function MereseAssistant({engine,context,institutions,finances,qu
   try{
    const response=parseMerese(question,{engine,institutions,finances,context,state:conversation.current});
    if(response.result.columns.some(c=>c==='POSICION_AT'||c==='MOTIVO_AT'))throw Error('Esta consulta no forma parte de este visor de reservas.');
+   response.result={...response.result,columns:response.result.columns.filter(c=>!/(^|_)AT($|_)/.test(c)),rows:response.result.rows.map(row=>Object.fromEntries(Object.entries(row).filter(([k])=>!/(^|_)AT($|_)/.test(k))))};
    if(response.action==='xlsx'||response.action==='csv'){
     await downloadQuery(response.result,response.action);setMessages(m=>[...m.slice(-11),{question,answer:'Descarga generada desde el resultado anterior.'}]);
    }else if(response.action==='chart'){
