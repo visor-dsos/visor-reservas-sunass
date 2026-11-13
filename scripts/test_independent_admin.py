@@ -65,12 +65,27 @@ check(data['eps'][codes[0]]['regulatorio']['programado'][0] is None,'Null preser
 check(s.version_file(version,'maestro_eps.json')==s.version_file(baseline['version'],'maestro_eps.json'),'Financial update preserves master')
 rejects(lambda:s.activate({'job':report['job']},session),400,'Explicit activation required')
 store.fail=True;rejects(lambda:s.activate({'job':report['job'],'confirm':True},session),503,'Storage activation failure surfaced');store.fail=False
-check(s.active()[0]['version']==baseline['version'],'Failed activation keeps baseline')
-r=s.activate({'job':report['job'],'confirm':True},session);check(r['active']['version']==version,'Activation persisted')
+check(s.active()[0]==baseline,'Failed activation preserves baseline and financial timestamp')
+with patch('admin_production.service.now',return_value='2026-11-14T02:30:00+00:00'):
+ r=s.activate({'job':report['job'],'confirm':True},session)
+check(r['active']['financial_updated_at']=='2026-11-14T02:30:00+00:00','Financial date uses server activation (13 November in Lima), not declared date')
+check(r['active']['activated_at']==r['active']['financial_updated_at'],'One atomic activation timestamp')
+check(r['active']['version']==version,'Activation persisted')
 check(Service(store,env).active()[0]['version']==version,'New process reads persisted version')
 rejects(lambda:s.activate({'job':report['job'],'confirm':True},session),409,'Stale preview rejected')
 rejects(lambda:s.rollback({'version':baseline['version']}),400,'Rollback confirmation required')
 s.rollback({'version':baseline['version'],'confirm':True});check(s.active()[0]['version']==baseline['version'],'Rollback restores previous version')
+check(s.active()[0]['updated_at']==baseline['updated_at'],'Recovery preserves original financial date')
+s.rollback({'version':version,'confirm':True})
+check(s.active()[0]['financial_updated_at']=='2026-11-14T02:30:00+00:00','Recovery retains activated financial date without changing immutable manifest')
+# Reuse staged files to isolate master-only timestamp semantics; no additional Excel processing.
+before,etag=s.active();job=secrets.token_hex(16);meta={**before,'mode':'master'}
+s.secret_put('candidates/'+job,{'owner':session['hash'],'expires':time.time()+60,'before_etag':etag,'before':before,'manifest':meta},new=True)
+with patch('admin_production.service.now',return_value='2026-11-15T06:00:00+00:00'):
+ result=s.activate({'job':job,'confirm':True},session)['active']
+check(result['financial_updated_at']==before['financial_updated_at'],'Master-only activation preserves financial timestamp')
+check(result['activated_at']=='2026-11-15T06:00:00+00:00','Master activation records its own operation time')
+check(s.overview()['ods']==25 and s.overview()['themes']==['MERESE','GRD'],'Overview derives institutional and thematic summary')
 check(s.version_file(version,'finanzas_eps.json') is not None,'Backup retained')
 check(all(k.startswith(PREFIX) for k in store.data),'All writes isolated under new prefix')
 with patch.dict('os.environ',{'R2_BUCKET':'visor-merese-sunass'}):

@@ -107,7 +107,11 @@ class Service:
             if expected and hashlib.sha256(raw).hexdigest()!=expected:raise ApiError(409,'Integridad de versión inválida.')
     def overview(self):
         active,_=self.active();self.verify_version(active)
-        return {'active':active,'storage':'connected','eps':50,'themes':['MERESE','GRD'],'cutoff':self.cutoff(json.loads(self.version_file(active['version'],'finanzas_eps.json')))}
+        data=json.loads(self.version_file(active['version'],'finanzas_eps.json'))
+        institutions=json.loads(Path(__file__).with_name('institutions.json').read_bytes())
+        codes=set(data['eps'])
+        themes=[label for field,label in (('implementacion','MERESE'),('implementacion_grd_acc','GRD')) if any(field in e for e in data['eps'].values())]
+        return {'active':active,'storage':'connected','eps':len(codes),'ods':len({i['ODS'] for i in institutions if str(i['COD_EP']) in codes}),'themes':themes,'server_time':now(),'cutoff':self.cutoff(data)}
     @staticmethod
     def cutoff(data):
         return max((r['fecha'] for e in data['eps'].values() for k in ('implementacion','implementacion_grd_acc') for r in e.get(k,[]) if r.get('fecha')),default=None)
@@ -115,12 +119,6 @@ class Service:
         # Only this method parses Excel. No pointer write is possible here.
         mode=body.get('mode','financial')
         if mode not in ('financial','master'):raise ApiError(400,'Modo inválido.')
-        institutional=body.get('financial_date')
-        if mode=='financial':
-            try:
-                value=datetime.fromisoformat(str(institutional))
-                if len(str(institutional))!=10 or value.date()>datetime.now(timezone.utc).date():raise ValueError()
-            except ValueError:raise ApiError(400,'Indique fecha institucional válida, no futura.')
         job=secrets.token_hex(16);lock=self.secret_put('update_lock',{'job':job,'started':now()},new=True)
         try:
             before,etag=self.active()
@@ -159,7 +157,6 @@ class Service:
                 financial=json.loads((stage/'finanzas_eps.json').read_bytes())
                 validation=json.loads((stage/('validation.json' if mode=='financial' else 'master_validation.json')).read_bytes())
                 meta.update(cutoff=self.cutoff(financial),eps=50,themes=['MERESE','GRD'],financial_version=version if mode=='financial' else before.get('financial_version',before['version']),master_version=version if mode=='master' else before.get('master_version',before['version']))
-                if mode=='financial':meta['financial_updated_at']=institutional+'T12:00:00-05:00'
                 self.store.put(PREFIX+'versions/'+version+'/manifest.json',pack(meta),new=True,public=True)
                 candidate={'owner':session['hash'],'expires':time.time()+3600,'before_etag':etag,'before':before,'manifest':meta,'validation':validation}
                 self.secret_put('candidates/'+job,candidate,new=True)
@@ -178,7 +175,12 @@ class Service:
             _,etag=self.active()
             if etag!=candidate['before_etag']:raise ApiError(409,'La versión activa cambió; valide nuevamente.')
             meta=candidate['manifest'];self.verify_version(meta)
-            meta={**meta,'activated_at':now(),'updated_by':'admin','updated_at':meta.get('financial_updated_at',candidate['before']['updated_at'])}
+            # Server timestamp becomes active only with the successful atomic pointer write.
+            stamp=now()
+            financial_stamp=stamp if meta.get('mode')=='financial' else candidate['before'].get('financial_updated_at',candidate['before']['updated_at'])
+            meta={**meta,'activated_at':stamp,'updated_by':'admin','financial_updated_at':financial_stamp,'updated_at':financial_stamp,
+                  'previous_state':{k:v for k,v in candidate['before'].items() if k!='previous_state'}}
+            meta.pop('recovered_at',None)
             self.store.put(PREFIX+'current.json',pack(meta),etag,etag is None,public=True)
             current,_=self.active()
             if current['version']!=meta['version']:raise ApiError(409,'Otra actualización reemplazó el puntero; consulte el estado.')
@@ -190,8 +192,10 @@ class Service:
         try:
             active,etag=self.active();previous=active.get('previous_version')
             if not previous or body.get('version')!=previous:raise ApiError(409,'Solo puede recuperar la versión anterior indicada.')
-            meta=json.loads(self.version_file(previous,'manifest.json'));self.verify_version(meta)
-            meta.update(recovered_at=now(),previous_version=active['version'])
+            saved=active.get('previous_state',{})
+            meta=dict(saved) if saved.get('version')==previous else json.loads(self.version_file(previous,'manifest.json'))
+            self.verify_version(meta)
+            meta.update(recovered_at=now(),previous_version=active['version'],previous_state={k:v for k,v in active.items() if k!='previous_state'})
             self.store.put(PREFIX+'current.json',pack(meta),etag,etag is None,public=True)
             current,_=self.active()
             if current['version']!=previous:raise ApiError(409,'No se pudo confirmar recuperación.')
