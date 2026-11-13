@@ -93,7 +93,7 @@ class Service:
         raw,etag=self.store.get(PREFIX+'current.json')
         return (json.loads(raw) if raw else self.baseline()),etag
     def version_file(self,version,name):
-        if not re.fullmatch(VERSION,version) or name not in PUBLIC_FILES:raise ApiError(404,'Recurso no disponible.')
+        if not re.fullmatch(VERSION,version) or name not in (*PUBLIC_FILES,'planes_merese.json'):raise ApiError(404,'Recurso no disponible.')
         raw,_=self.store.get(PREFIX+'versions/'+version+'/'+name)
         if raw is None and version==self.baseline()['version']:
             raw=pack(self.baseline()) if name=='manifest.json' else (BASELINE/name).read_bytes()
@@ -101,7 +101,7 @@ class Service:
         return raw
     def verify_version(self,manifest):
         if manifest.get('status')!='validated':raise ApiError(409,'Versión no validada.')
-        for name in PUBLIC_FILES:
+        for name in (*PUBLIC_FILES,*(['planes_merese.json'] if 'planes_merese.json' in manifest.get('sha256',{}) else [])):
             raw=self.version_file(manifest['version'],name)
             expected=manifest.get('sha256',{}).get(name)
             if expected and hashlib.sha256(raw).hexdigest()!=expected:raise ApiError(409,'Integridad de versión inválida.')
@@ -124,7 +124,7 @@ class Service:
             before,etag=self.active()
             # Persist the original published baseline as an independent recovery version.
             baseline=self.baseline()
-            for name in PUBLIC_FILES:
+            for name in (*PUBLIC_FILES,*(['planes_merese.json'] if (BASELINE/'planes_merese.json').exists() else [])):
                 key=PREFIX+'versions/'+baseline['version']+'/'+name
                 if self.store.get(key)[0] is None:
                     self.store.put(key,pack(baseline) if name=='manifest.json' else (BASELINE/name).read_bytes(),new=True,public=True)
@@ -148,14 +148,19 @@ class Service:
                 stage=root/'derived'
                 for name in ('maestro_eps.json','master_validation.json') if mode=='financial' else FILES:
                     (stage/name).write_bytes(self.version_file(before['version'],name))
+                if mode=='master':
+                    try:plan_raw=self.version_file(before['version'],'planes_merese.json')
+                    except (ApiError,FileNotFoundError):plan_raw=pack({'schema':1,'eps':{},'summary':{'measures':0,'available_eps':0,'pending_eps':0,'warnings':['La versión financiera no contiene planes.']}})
+                    (stage/'planes_merese.json').write_bytes(plan_raw)
                 version=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'_'+job[:8]
                 meta={**before,'version':version,'base':self.public+'versions/'+version+'/','status':'validated','previous_version':before['version'],'prepared_at':now(),'sha256':{},'mode':mode}
                 meta.pop('derived_files',None)
-                for name in PUBLIC_FILES:
+                for name in (*PUBLIC_FILES,'planes_merese.json'):
                     if name=='manifest.json':continue
                     raw=(stage/name).read_bytes();meta['sha256'][name]=hashlib.sha256(raw).hexdigest();self.store.put(PREFIX+'versions/'+version+'/'+name,raw,new=True,public=True)
                 financial=json.loads((stage/'finanzas_eps.json').read_bytes())
                 validation=json.loads((stage/('validation.json' if mode=='financial' else 'master_validation.json')).read_bytes())
+                meta['plans']=json.loads((stage/'planes_merese.json').read_bytes())['summary']
                 meta.update(cutoff=self.cutoff(financial),eps=50,themes=['MERESE','GRD'],financial_version=version if mode=='financial' else before.get('financial_version',before['version']),master_version=version if mode=='master' else before.get('master_version',before['version']))
                 self.store.put(PREFIX+'versions/'+version+'/manifest.json',pack(meta),new=True,public=True)
                 candidate={'owner':session['hash'],'expires':time.time()+3600,'before_etag':etag,'before':before,'manifest':meta,'validation':validation}

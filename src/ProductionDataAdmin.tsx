@@ -5,7 +5,7 @@ import {availableMonths,reserveRows,reserveTotals,reserveEstimates,reserveSum,re
 import type {Finance} from './interventionIndicators';
 import './ProductionDataAdmin.css';
 import logo from './assets/logo-sunass-oficial.png';
-type Active={version:string;base:string;updated_at:string;financial_updated_at?:string;activated_at?:string;cutoff?:string;previous_version?:string;recovered_at?:string;previous_state?:Active};
+type Active={version:string;base:string;updated_at:string;financial_updated_at?:string;activated_at?:string;cutoff?:string;previous_version?:string;recovered_at?:string;previous_state?:Active;plans?:{measures:number;available_eps:number;pending_eps:number}};
 type Report={status:string;job:string;before:Active;proposed:Active;before_cutoff:string|null;validation:{eps:number;records:Record<string,number>;warnings:string[];warnings_count:number;errors?:string[]}};
 type Totals={theme:string;execution:number|null;balance:number|null;program:number|null};
 async function api(action:string,body:unknown={},csrf=''){
@@ -45,7 +45,7 @@ export default function ProductionDataAdmin(){
    </section>
    {report&&comparison&&<section className="pa-section"><h2>Previsualización antes de activar</h2><p className={'pa-notice '+(canActivate?'pa-success':'pa-error')}>{canActivate?'Validación satisfactoria. La versión propuesta aún no está activa.':'Errores que impiden activar.'}</p>
     <div className="pa-preview"><div><h3>Actualmente activa</h3>{versionDetails(report.before)}<p>Actualización financiera: {adminDate(report.before.financial_updated_at??report.before.updated_at)}</p><p>Corte: {adminDate(report.before_cutoff,true)}</p></div><div><h3>Versión propuesta</h3>{versionDetails(report.proposed)}<p>Actualización financiera: {mode==='financial'?'Se registrará al activar':adminDate(report.before.financial_updated_at??report.before.updated_at)}</p><p>Corte: {adminDate(report.proposed.cutoff,true)}</p></div></div>
-    <p><strong>{report.validation.eps} EPS</strong> · Registros procesados: {Object.entries(report.validation.records).map(([k,v])=>`${k}: ${v}`).join(' · ')}</p>
+    <p>Planes MERESE: {report.proposed.plans?.measures??0} medidas · {report.proposed.plans?.available_eps??0} EPS con plan disponible · {report.proposed.plans?.pending_eps??0} EPS pendientes de revisión. Se activarán junto con esta versión.</p><p><strong>{report.validation.eps} EPS</strong> · Registros procesados: {Object.entries(report.validation.records).map(([k,v])=>`${k}: ${v}`).join(' · ')}</p>
     {!!report.validation.warnings_count&&<details className="pa-notice pa-warning"><summary>Advertencias ({report.validation.warnings_count})</summary><ul>{report.validation.warnings.map((w,i)=><li key={i}>{w}</li>)}</ul></details>}
     {!!report.validation.errors?.length&&<ul className="pa-notice pa-error">{report.validation.errors.map((e,i)=><li key={i}>{e}</li>)}</ul>}
     <div className="pa-table"><table><caption>Comparación financiera</caption><thead><tr><th>Temática</th><th>Indicador</th><th>Anterior</th><th>Propuesto</th></tr></thead><tbody>{comparison.before.flatMap((b,i)=>([['execution','Ejecución'],['balance','Último saldo'],['program','Programación PR']] as const).map(([k,label])=><tr key={b.theme+k}><td>{b.theme}</td><td>{label}</td><td>{reserveMoney(b[k])}</td><td>{reserveMoney(comparison.after[i][k])}</td></tr>))}</tbody></table></div>

@@ -66,7 +66,12 @@ def run(root,mode="financial"):
     counts['Ejeseparado']=add_ejeseparado(source,f,known,warnings)
     f['fuente']='Reportes Regulatorios DRE-SUNASS'
     dump(stage/'finanzas_eps.json',f)
-    dump(stage/'validation.json',{'status':'validated','errors':[],'warnings':warnings,'warnings_count':len(warnings),'eps':len(known),'records':counts,'themes':['MERESE','GRD Y ACC'],'sheets':['Implementacion','Ejecucion','Ejeseparado'],'source_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),'source_size':source.stat().st_size})
+    from plans import build
+    plans=build(source,f,known)
+    plans['financial_sha256']=hashlib.sha256((stage/'finanzas_eps.json').read_bytes()).hexdigest()
+    dump(stage/'planes_merese.json',plans)
+    warnings.extend(plans['summary']['warnings'])
+    dump(stage/'validation.json',{'status':'validated','errors':[],'warnings':warnings,'warnings_count':len(warnings),'eps':len(known),'records':counts,'themes':['MERESE','GRD Y ACC'],'plans':plans['summary'],'sheets':['Implementacion','Ejecucion','Ejeseparado','Base Trabajable'],'source_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),'source_size':source.stat().st_size})
 if __name__=='__main__':
     try:run(sys.argv[1],sys.argv[2] if len(sys.argv)>2 else "financial")
     except Exception as e:

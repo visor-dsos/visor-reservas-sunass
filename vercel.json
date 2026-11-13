@@ -12,6 +12,11 @@
       "maxDuration": 30,
       "includeFiles": "admin_production/**",
       "excludeFiles": "{src/**,public/**,dist/**,node_modules/**,**/__pycache__/**,**/*.xlsx,**/.env*}"
+    },
+    "api/reserve_plan.py": {
+      "maxDuration": 30,
+      "includeFiles": "admin_production/**",
+      "excludeFiles": "{src/**,public/**,dist/**,node_modules/**,**/__pycache__/**,**/*.xlsx,**/.env*}"
     }
   },
   "rewrites": [
