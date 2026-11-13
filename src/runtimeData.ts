@@ -1,7 +1,9 @@
 // Public location configuration only. Never place credentials in VITE_*.
 export const runtimeMode=true;
-export const runtimeCurrentUrl='/data/runtime-reservas/current.json';
-export async function runtimePointer(){
+export const runtimeCurrentUrl=(import.meta.env.DEV?'/data/runtime-reservas/current.json':'/runtime/current.json');
+let pointerRequest:Promise<any>|undefined;
+export function runtimePointer(){return pointerRequest??=readPointer()}
+async function readPointer(){
  const url=new URL(runtimeCurrentUrl,location.origin);url.searchParams.set('t',String(Date.now()));
  const response=await fetch(url,{cache:'no-store'});if(response.status===404)return null;
  if(!response.ok)throw Error('No se pudo cargar current.json');

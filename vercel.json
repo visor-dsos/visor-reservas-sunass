@@ -1,1 +1,31 @@
-{"framework": "vite", "buildCommand": "npm run build", "outputDirectory": "dist"}
+{
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/reserve_admin.py": {
+      "maxDuration": 300,
+      "includeFiles": "admin_production/**",
+      "excludeFiles": "{src/**,public/**,dist/**,node_modules/**,**/__pycache__/**,**/*.xlsx,**/.env*}"
+    },
+    "api/reserve_data.py": {
+      "maxDuration": 30,
+      "includeFiles": "admin_production/**",
+      "excludeFiles": "{src/**,public/**,dist/**,node_modules/**,**/__pycache__/**,**/*.xlsx,**/.env*}"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/admin",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/runtime/current.json",
+      "destination": "/api/reserve_data?file=current.json"
+    },
+    {
+      "source": "/runtime/versions/:version/:file",
+      "destination": "/api/reserve_data?version=:version&file=:file"
+    }
+  ]
+}
