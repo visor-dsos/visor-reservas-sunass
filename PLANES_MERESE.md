@@ -12,18 +12,24 @@
 342 medidas MRSE, 50 EPS. Se conservaron sin recalcular los 42 casos inicialmente conciliados (280 medidas, S/ 108,478,821.67).
 Los siete casos adicionales con metadatos regulatorios concilian exactamente: COD_EP 14, 43, 45, 31, 37, 42, 16.
 49 EPS comparables: S/ 131,631,684.67; diferencia con la estimación anual del mismo universo: S/ 0.
-COD_EP 8 (Tumbes): 9 medidas por S/ 300,000. Sin fecha de inicio, duración ni año vigente en los datos del visor; se muestran como no disponibles y no se inventa conciliación.
-Total de planes disponibles (50 EPS): S/ 131,931,684.67. La diferencia nacional de S/ 300,000 corresponde exclusivamente al plan de Tumbes, fuera del universo con estimación regulatoria disponible.
+COD_EP 8 (Tumbes): no tiene reserva MERESE aprobada. Sus 9 medidas por S/ 300,000 se conservan exclusivamente como trazabilidad y no se descargan ni suman a planes vigentes. La política se aplica en el importador, selector y API, incluso para versiones anteriores.
+Planes aprobados: 49 EPS, 333 medidas, S/ 131,631,684.67.
 COD_EP 43 no tiene resolución informada: se mantiene explícitamente no disponible; su único plan marcado SI concilia por S/ 1,613,000.
 Los vacíos dentro del PR se conservan; los totales son importes disponibles, no imputaciones de cero. Los años fuera de la duración conocida dicen «No aplica».
 
 ## Actualización y seguridad
 La carga financiera procesa Base Trabajable y crea `planes_merese.json` en la misma versión que las finanzas. La previsualización informa medidas/EPS/pendientes. Solo la activación explícita del puntero hace vigente el conjunto. El rollback recupera los planes de esa misma versión. La actualización del maestro conserva los planes financieros.
 Si falta Base Trabajable, la nueva versión informa planes no disponibles; nunca arrastra silenciosamente planes de otra versión.
-La API pública entrega únicamente el plan de la EPS solicitada (Excel de dos hojas) y verifica el hash financiero. No expone el conjunto completo, el Excel institucional, rutas privadas ni enlaces de SharePoint.
+La API pública entrega únicamente el plan de la EPS solicitada (Excel de una sola hoja, Plan de intervenciones) y verifica el hash financiero. No expone el conjunto completo, el Excel institucional, rutas privadas ni enlaces de SharePoint.
 El visor original, sus credenciales, finanzas y almacenamiento no se modifican.
 
 ## Verificación
 33 comprobaciones dirigidas iniciales satisfactorias (Excel, cinco años, texto literal, totales, vigencia, activación/rollback y aislamiento).
 Tras la aclaración metodológica: comprobación específica de los ocho casos restantes, preservación de metadatos del visor y generación XLSX; los 42 anteriores no se repitieron.
 UI local comprobada: botón junto a ficha, diálogo, búsqueda, preselección, confirmación, descarga real COD_EP 10, filtros globales intactos y GRD deshabilitado. TypeScript y build completados; build local contiene la nueva funcionalidad. Descarga pública se comprueba después del despliegue.
+
+## Cierre dirigido: saldo evaluado y formato final
+18 controles de saldo evaluado y 20 de formato/política de planes satisfactorios. No se repitieron las conciliaciones anteriores. TypeScript satisfactorio; build satisfactorio tras autorizar el inicio de esbuild fuera del sandbox (EPERM de entorno).
+Saldo evaluado: último saldo finito dentro del intervalo regulatorio ya validado, limitado por Hasta; nunca suma mensual ni arrastre de otro año. Cero válido conservado; AR1 no aplica. Cada saldo exporta la fecha del registro usado.
+Alertas positivas nacionales: MERESE 1 → 1; GRD 4 → 4. MERESE: EMSAPA CALCA y EMAPA-HVCA pasan de No determinable a No, porque su saldo evaluado acredita el incumplimiento del umbral aun sin porcentaje. EPS MANTARO y EMAPA PASCO pasan de No a No determinable por ausencia de saldo dentro del año evaluado. GRD: MANTARO, PASCO y EMAPA-Y pasan de No a No determinable por el mismo motivo.
+Excel: encabezado de tres filas; cinco años; una sola hoja; SEDACAJ total S/ 3,603,250.67. Metadatos PR del visor y hash financiero conservados. Las pruebas previas de activación/rollback siguen vigentes: no se modificó service.py ni se activaron datos en producción.

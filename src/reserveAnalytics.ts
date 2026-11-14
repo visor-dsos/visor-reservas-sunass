@@ -1,3 +1,4 @@
+import {sunassAlert} from './reserveAlertBalance';
 import {reserveRows,reserveFlag,reserveSum,reserveEstimates,completedYear,cumulativeYear,executionAtCut,type ReserveRow} from './reserveMonitoring';
 import type {Finance} from './interventionIndicators';
 import type {Institution,MereseEngine} from './mereseQueryEngine';
@@ -14,7 +15,7 @@ export const definitions:Record<string,string>={
  EJECUCION_1000:'Ejecución por 1,000 conexiones: ejecución / conexiones administradas × 1,000.',
  RECONOCIDO_CONEXION:'Monto reconocido por conexión: monto reconocido PR / conexiones administradas.',
  EJECUCION_HA:'Ejecución MERESE por ha: ejecución / área de interés hídrico ya validada. Indicador comparativo territorial; no implica causalidad y no aplica a GRD y ACC.',
- ALERTA_SUNASS:'Alerta SUNASS: saldo bancario > S/ 1,000,000 y ejecución acumulada / estimación acumulada del año regulatorio evaluado < 25%. AR vigente 1 no genera alerta.',
+ ALERTA_SUNASS:'Alerta SUNASS: saldo bancario del año regulatorio evaluado > S/ 1,000,000 y ejecución acumulada / estimación acumulada del año regulatorio evaluado < 25%. AR vigente 1 no genera alerta.',
  SITUACIONES:'Situaciones de seguimiento: observaciones analíticas, no incumplimientos normativos. Antigüedad se muestra sin tolerancia inventada; persistencia exige al menos dos cortes anuales consecutivos con saldo positivo.',
  POSICION_AT:'Orden relativo del ámbito: 50% raíz cuadrada del saldo / saldo máximo, 30% baja ejecución del PR y 20% bajo avance del PR. Información incompleta al final; tamaño no altera prioridad.',
  PCT_EJECUCION_ACUMULADA:'Ejeseparado: suma de ejecución anual / suma de estimación anual hasta AR vigente menos uno, máximo duración PR y cinco. Sin denominador válido: —.',
@@ -44,7 +45,7 @@ export function analyticRows(engine:MereseEngine,finances:Record<string,Finance>
   const noExecution=Number(row.SALDO)>0&&row.EJECUCION_PERIODO===0,low=numeric(row.PCT_EJECUCION_ACUMULADA)!=null&&Number(row.PCT_EJECUCION_ACUMULADA)<25;
   const situations=[noExecution?'Sin ejecución con saldo':null,low?'Ejecución acumulada inferior a 25% (seguimiento analítico)':null,consecutive>=2?'Saldo positivo en '+consecutive+' cortes anuales consecutivos':null,missing.length?'Información incompleta: '+missing.join(', '):null].filter(Boolean).join('; ');
   const flag=reserveFlag(row),execPR=executionAtCut(f,to,true),execTotal=executionAtCut(f,to),advance=ratio(execPR,rec.total,100);
-  return {...row,EJECUCION_PR:execPR,EJECUCION_TOTAL:execTotal,PCT_AVANCE_PR:advance,REGION:m?.REGION??null,T_EPS:m?.T_EPS??null,POBLACION:m?.POBLACION??null,CONEXIONES:m?.CONEXIONES??null,PCT_ACTIVAS:m?.PCT_ACTIVAS??null,RECONOCIDO_PR:rec.total,RECONOCIDO_AVANCE:rec.advance,SALDO_CONEXION:ratio(row.SALDO,m?.CONEXIONES),EJECUCION_1000:ratio(row.EJECUCION_PERIODO,m?.CONEXIONES,1000),RECONOCIDO_CONEXION:ratio(rec.total,m?.CONEXIONES),...(reserve==='MERESE'?{AREA_INTERES_HA:t?.interestHa??null,CUENCAS:t?.basins.join(', ')??null,EJECUCION_HA:ratio(row.EJECUCION_PERIODO,t?.interestHa),HA_MILLON:ratio(t?.interestHa,row.EJECUCION_PERIODO,1000000)}:{}),ALERTA_SUNASS:flag?'Sí':row.SALDO==null||row.PCT_EJECUCION_ACUMULADA==null?'No determinable':'No',SITUACIONES:situations||'Sin situaciones identificadas',PERSISTENCIA:consecutive,ANTIGUEDAD_MESES:age} as ReserveRow;
+  return {...row,EJECUCION_PR:execPR,EJECUCION_TOTAL:execTotal,PCT_AVANCE_PR:advance,REGION:m?.REGION??null,T_EPS:m?.T_EPS??null,POBLACION:m?.POBLACION??null,CONEXIONES:m?.CONEXIONES??null,PCT_ACTIVAS:m?.PCT_ACTIVAS??null,RECONOCIDO_PR:rec.total,RECONOCIDO_AVANCE:rec.advance,SALDO_CONEXION:ratio(row.SALDO,m?.CONEXIONES),EJECUCION_1000:ratio(row.EJECUCION_PERIODO,m?.CONEXIONES,1000),RECONOCIDO_CONEXION:ratio(rec.total,m?.CONEXIONES),...(reserve==='MERESE'?{AREA_INTERES_HA:t?.interestHa??null,CUENCAS:t?.basins.join(', ')??null,EJECUCION_HA:ratio(row.EJECUCION_PERIODO,t?.interestHa),HA_MILLON:ratio(t?.interestHa,row.EJECUCION_PERIODO,1000000)}:{}),ALERTA_SUNASS:sunassAlert(row),SITUACIONES:situations||'Sin situaciones identificadas',PERSISTENCIA:consecutive,ANTIGUEDAD_MESES:age} as ReserveRow;
  });
  return prioritize(rows);
 }

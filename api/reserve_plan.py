@@ -6,11 +6,13 @@ from urllib.parse import urlparse,parse_qs
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from admin_production.service import R2,PREFIX,BASELINE,VERSION
 from admin_production.plan_export import export
+from admin_production.plan_policy import UNAPPROVED_MERESE
 class handler(BaseHTTPRequestHandler):
  def do_GET(self):
   try:
    q=parse_qs(urlparse(self.path).query);version=q.get('version',[''])[0];code=q.get('code',[''])[0];download=q.get('download',[''])[0]=='1'
    if not re.fullmatch(VERSION,version) or not re.fullmatch(r'\d{1,3}',code):return self.reply(400,{'error':'Seleccione una EPS válida y una versión financiera.'})
+   if code in UNAPPROVED_MERESE:return self.reply(422,{'error':UNAPPROVED_MERESE[code]})
    store=R2();baseline=json.loads((BASELINE/'manifest.json').read_bytes())
    def read(name):
     raw,_=store.get(PREFIX+'versions/'+version+'/'+name)
